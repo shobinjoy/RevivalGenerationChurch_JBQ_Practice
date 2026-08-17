@@ -172,14 +172,40 @@ main{max-width:1000px; margin:0 auto; padding:8px 20px 60px}
 #tough-print-view .tp-a{font-family:var(--sans); font-size:13px; color:var(--muted); margin:0}
 .header-btn{background:#20262F; color:#fff; border:1px solid #333C48; border-radius:7px; padding:7px 13px; font-weight:700; font-size:14px}
 .header-btn:hover{background:#2A313C}
-.name-tag{font-family:var(--mono); font-size:12px; color:#9AA3B2; align-self:center}
+.kids-tag-btn{font-family:var(--mono); font-size:12px}
+.kids-tag-btn[hidden]{display:none}
 .modal-overlay{position:fixed; inset:0; background:rgba(16,20,26,.55); display:none; align-items:center; justify-content:center; z-index:50; padding:20px}
 .modal-overlay.on{display:flex}
-.modal{background:var(--panel); border-radius:14px; padding:26px 28px; max-width:380px; width:100%}
+.modal{background:var(--panel); border-radius:14px; padding:26px 28px; max-width:380px; width:100%; max-height:86vh; overflow-y:auto}
 .modal h2{margin:0 0 8px; font-size:20px}
 .modal p{margin:0 0 16px; color:var(--muted); font-size:14px; line-height:1.5}
-.modal input[type=text]{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; margin-bottom:16px; box-sizing:border-box}
-.modal-actions{display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap}
+.modal input[type=text]{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; box-sizing:border-box}
+.modal-actions{display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin-top:16px}
+
+/* ---------- kids: add row + management list ---------- */
+.kid-add-row{display:flex; gap:8px}
+.kid-add-row input{flex:1; padding:10px 12px; border:1px solid var(--line); border-radius:8px; box-sizing:border-box}
+.kid-add-row button{flex:none}
+.kid-manage-list{margin-top:14px; display:flex; flex-direction:column; gap:8px}
+.kid-manage-row{display:flex; align-items:center; gap:8px; padding:9px 11px; border:1px solid var(--line); border-radius:9px; flex-wrap:wrap}
+.kid-manage-name{font-weight:700; flex:1 1 auto; min-width:80px}
+.kid-manage-count{font-family:var(--mono); font-size:12px; color:var(--muted); white-space:nowrap}
+.kid-manage-row .mini{padding:5px 10px; font-size:12px}
+.kid-remove{border:0; background:transparent; color:var(--muted); font-size:16px; line-height:1; padding:2px 6px; border-radius:5px}
+.kid-remove:hover{background:var(--bg); color:var(--miss)}
+
+/* ---------- kid selector row (above the drill question) ---------- */
+.kid-row{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px}
+.kid-btn{position:relative; background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:7px 16px 7px 14px;
+  font-weight:700; font-size:14px; color:var(--muted)}
+.kid-btn[aria-pressed="true"]{background:var(--ink); border-color:var(--ink); color:#fff}
+.kid-btn .kid-status{display:inline-block; margin-left:6px; font-weight:900}
+.kid-btn .kid-status.right{color:var(--good)}
+.kid-btn .kid-status.wrong{color:#FF8A78}
+.kid-btn[aria-pressed="true"] .kid-status.right{color:#6FE3A6}
+.kid-btn[aria-pressed="true"] .kid-status.wrong{color:#FF9E90}
+.kid-row-manage{background:transparent; border:1px dashed var(--line); border-radius:999px; padding:7px 14px; font-weight:700; font-size:13px; color:var(--muted)}
+.scoring-for{font-family:var(--mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:8px}
 
 @media print{
   header.bar, nav.tabs, .toolbar, .actions, .fam-f, .statbar, .hint, .foot, .custom-panel{display:none !important}
@@ -201,9 +227,11 @@ main{max-width:1000px; margin:0 auto; padding:8px 20px 60px}
   .wordmark{order:1; flex:1 1 auto; min-width:0}
   .refresh-field{order:2; flex:0 0 auto}
   .refresh-field label{display:none}
-  .name-tag{order:3; flex:1 1 100%}
+  .kids-tag-btn{order:3; flex:1 1 100%}
   .meet-field{order:4; flex:1 1 calc(50% - 5px); min-width:0}
   .league-field{order:5; flex:1 1 calc(50% - 5px); min-width:0}
+  .kid-row{gap:6px}
+  .kid-btn{padding:6px 12px 6px 11px; font-size:13px}
   .bar select, .seg{width:100%}
   .seg button{flex:1}
   .header-btn{padding:6px 8px; font-size:16px; line-height:1}
@@ -251,7 +279,7 @@ body.printing-tough #tough-print-view{display:block !important}
     <div class="wordmark"><span class="jbq">JB<span class="q-letter">Q</span></span>
       <span>PRACTICE<small>Ohio Central · 2026–27</small></span>
     </div>
-    <span class="name-tag" id="name-tag" hidden></span>
+    <button class="header-btn kids-tag-btn" id="kids-tag-btn" hidden></button>
     <div class="spacer"></div>
     <div class="meet-field">
       <label for="meet">Practicing for</label>
@@ -273,11 +301,14 @@ body.printing-tough #tough-print-view{display:block !important}
 
 <div class="modal-overlay" id="name-modal">
   <div class="modal">
-    <h2>Who's practicing?</h2>
-    <p>Enter the child's name (optional) — it'll be added to any printed tough-list PDF.</p>
-    <input type="text" id="name-input" placeholder="Child's name" maxlength="60">
+    <h2 id="kids-modal-title">Who's practicing?</h2>
+    <p id="kids-modal-sub">Add each child's name. You'll be able to pick who's answering before each question, and download a separate tough-list PDF for every kid.</p>
+    <div class="kid-add-row">
+      <input type="text" id="kid-input" placeholder="Child's name" maxlength="60">
+      <button class="btn ghost" id="kid-add">Add</button>
+    </div>
+    <div class="kid-manage-list" id="kid-manage-list"></div>
     <div class="modal-actions">
-      <button class="btn ghost" id="name-skip">Skip</button>
       <button class="btn primary" id="name-start">Start practicing</button>
     </div>
   </div>
@@ -406,11 +437,10 @@ const state = {
   famPts:{10:true,20:true,30:true}, showAns:false, showLater:false, sortBySize:false,
   famFilter:null,           // drill restricted to one look-alike set
   current:null, revealed:false,
-  seen:0, right:0, streak:0, best:0,
-  tough:{}, bag:[], shown:0,
+  bag:[], shown:0,
   customRange:{10:[1,288], 20:[289,480], 30:[481,576]},
   timerLeft:0, timerId:null, timedOut:false,
-  childName:'',
+  kids:[], kidSeq:0, activeKidId:null, currentAttempts:{}, everStarted:false,
   browsePt:'all', browseQuote:false, browseScope:'both'
 };
 
@@ -424,6 +454,36 @@ const store = {
 const el = s => document.querySelector(s);
 const els = s => [...document.querySelectorAll(s)];
 
+/* ---------- kids ---------- */
+function makeKid(name){
+  state.kidSeq++;
+  return {id:'k'+state.kidSeq, name, tough:{}, seen:0, right:0, streak:0, best:0};
+}
+// Shown before setup is finished / if the roster is ever emptied. Never added to
+// state.kids and never persisted, so it can't leak into the kids list or a PDF.
+const PLACEHOLDER_KID = {id:null, name:'Practice', tough:{}, seen:0, right:0, streak:0, best:0};
+function activeKid(){
+  if(!state.kids.length) return PLACEHOLDER_KID;
+  let k = state.kids.find(x => x.id===state.activeKidId);
+  if(!k){ k = state.kids[0]; state.activeKidId = k.id; }
+  return k;
+}
+function saveKids(){ store.set('jbq:kids', state.kids); }
+function recordAttempt(kid, q, ok){
+  const prev = state.currentAttempts[kid.id];
+  if(prev === undefined) kid.seen++;
+  if(ok){
+    if(prev !== 'right'){ kid.right++; kid.streak++; kid.best = Math.max(kid.best, kid.streak); }
+    delete kid.tough[q.n];
+  } else {
+    if(prev === 'right') kid.right--;
+    kid.streak = 0;
+    kid.tough[q.n] = true;
+  }
+  state.currentAttempts[kid.id] = ok ? 'right' : 'wrong';
+  saveKids();
+}
+
 function inMeet(q){
   if(state.meet==='custom'){
     const r = state.customRange[q.p];
@@ -434,10 +494,11 @@ function inMeet(q){
   return !!r && q.n>=r[0] && q.n<=r[1];
 }
 function pool(){
+  const kid = activeKid();
   return DATA.filter(q => inMeet(q)
     && state.pts[q.p]
     && (!state.onlyQuote || q.Q)
-    && (!state.toughOnly || state.tough[q.n])
+    && (!state.toughOnly || (kid && kid.tough[q.n]))
     && (!state.famFilter || state.famFilter.includes(q.n)));
 }
 function tokens(q){ return q.q.split(/\s+/); }
@@ -502,8 +563,8 @@ function flashCard(){
 function timeUp(){
   const q = state.current; if(!q || state.revealed) return;
   state.timedOut = true;
-  state.seen++; state.streak=0; state.tough[q.n]=true;
-  store.set('jbq:tough', state.tough);
+  const kid = activeKid();
+  if(kid) recordAttempt(kid, q, false);
   beep();
   flashCard();
   paintCard();
@@ -538,13 +599,26 @@ function draw(){
   state.current = p.find(q=>q.n===n);
   state.revealed = false;
   state.timedOut = false;
+  state.currentAttempts = {};
   state.shown++;
   paintCard();
 }
+function kidRowHTML(){
+  return `<div class="kid-row">
+    ${state.kids.map(k => {
+      const status = state.currentAttempts[k.id];
+      const statusHTML = status ? `<span class="kid-status ${status}">${status==='right'?'✓':'✕'}</span>` : '';
+      return `<button class="kid-btn" data-kid="${k.id}" aria-pressed="${k.id===state.activeKidId}">${esc(k.name)}${statusHTML}</button>`;
+    }).join('')}
+    <button class="kid-row-manage" data-act="managekids">+ Kids</button>
+  </div>`;
+}
 function paintCard(){
   const c = el('#drill-card'), q = state.current;
+  const kid = activeKid();
   if(!q){
-    c.innerHTML = `<div class="empty">Nothing to drill with these filters. Turn a point value back on, or clear the tough list filter.</div>`;
+    c.innerHTML = `${kidRowHTML()}<div class="empty">Nothing to drill with these filters. Turn a point value back on, or clear the tough list filter.</div>`;
+    wireKidRow();
     return;
   }
   const timerActive = !!state.timerId;
@@ -554,13 +628,16 @@ function paintCard(){
     ? `${preRevealExtra}<button class="btn primary" data-act="reveal">Show the answer<kbd>space</kbd></button>`
     : (state.timedOut ? '' : `<button class="btn good" data-act="right" aria-label="Got it"><span class="icon" aria-hidden="true">✓</span><span class="btn-label">Got it<kbd>G</kbd></span></button>
            <button class="btn miss" data-act="wrong" aria-label="Missed it"><span class="icon" aria-hidden="true">✕</span><span class="btn-label">Missed it<kbd>M</kbd></span></button>`);
-  const skipLabel = state.revealed && state.timedOut ? 'Next question' : 'Skip';
+  const anyScored = Object.keys(state.currentAttempts).length > 0;
+  const skipLabel = anyScored ? 'Next question' : 'Skip';
+  const scoringForHTML = state.revealed && !state.timedOut ? `<div class="scoring-for">Scoring for: ${esc(kid.name)}</div>` : '';
   c.innerHTML = `
+    ${kidRowHTML()}
     <div class="meta">
       <span>Question #${state.shown}</span>
       <span class="pts">${q.p} points</span>
       ${q.Q ? '<span class="qq">Quotation question</span>' : ''}
-      ${state.tough[q.n] ? '<span>· on the tough list</span>' : ''}
+      ${kid.tough[q.n] ? `<span>· on ${esc(kid.name)}'s tough list</span>` : ''}
       ${timerActive ? `<span class="timer-badge" id="timer-badge">${state.timerLeft} second${state.timerLeft===1?'':'s'}</span>` : ''}
       ${state.timedOut ? '<span class="miss-note">Time&#39;s up — marked as missed</span>' : ''}
     </div>
@@ -568,6 +645,7 @@ function paintCard(){
     <div class="answer ${state.revealed?'':'hidden'}">
       <div class="alabel">Answer</div>${answerHTML(q)}
     </div>
+    ${scoringForHTML}
     <div class="actions">
       ${scoreButtons}
       <button class="btn ghost" data-act="skip">${skipLabel}<kbd>S</kbd></button>
@@ -576,20 +654,28 @@ function paintCard(){
     </div>
     <div class="statbar">
       <span class="stat">Total Questions: <b>${poolSize}</b>${state.famFilter ? ' · look-alike set' : ''}</span>
-      <span class="stat"><b>${state.right}/${state.seen}</b>this session</span>
-      <span class="stat"><b>${state.streak}</b>streak · best ${state.best}</span>
-      <span class="stat"><b>${Object.keys(state.tough).length}</b>on the tough list
-        ${state.toughOnly && Object.keys(state.tough).length ? '<button class="mini" data-act="dltough">Download tough list (PDF)</button> <button class="mini wa-share" data-act="whatsapp">Share via WhatsApp</button>' : ''}</span>
+      <span class="stat"><b>${kid.right}/${kid.seen}</b>${esc(kid.name)} this session</span>
+      <span class="stat"><b>${kid.streak}</b>streak · best ${kid.best}</span>
+      <span class="stat"><b>${Object.keys(kid.tough).length}</b>on ${esc(kid.name)}'s tough list
+        ${state.toughOnly && Object.keys(kid.tough).length ? `<button class="mini" data-act="dltough">Download tough list (PDF)</button> <button class="mini wa-share" data-act="whatsapp">Share via WhatsApp</button>` : ''}</span>
     </div>`;
+  wireKidRow();
 }
-function score(ok){
+function wireKidRow(){
+  els('.kid-btn').forEach(b => b.onclick = () => {
+    state.activeKidId = b.dataset.kid;
+    state.timedOut = false;
+    stopTimer();
+    paintCard();
+  });
+  const mb = el('[data-act="managekids"]'); if(mb) mb.onclick = showNameModal;
+}
+function scoreActive(ok){
   const q = state.current; if(!q) return;
+  const kid = activeKid(); if(!kid) return;
   stopTimer();
-  state.seen++;
-  if(ok){ state.right++; state.streak++; state.best=Math.max(state.best,state.streak); delete state.tough[q.n]; }
-  else { state.streak=0; state.tough[q.n]=true; }
-  store.set('jbq:tough', state.tough);
-  draw();
+  recordAttempt(kid, q, ok);
+  paintCard();
 }
 el('#drill-card').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if(!b) return;
@@ -597,8 +683,8 @@ el('#drill-card').addEventListener('click', e => {
   if(a==='reveal') revealAnswer();
   else if(a==='timer5') startCountdown(5, timeUp);
   else if(a==='stoptimer'){ stopTimer(); paintCard(); }
-  else if(a==='right') score(true);
-  else if(a==='wrong') score(false);
+  else if(a==='right') scoreActive(true);
+  else if(a==='wrong') scoreActive(false);
   else if(a==='skip') draw();
   else if(a==='clearfam'){ state.famFilter=null; resetBag(); draw(); }
   else if(a==='dltough') downloadToughPDF();
@@ -608,8 +694,8 @@ document.addEventListener('keydown', e => {
   if(el('#view-drill').classList.contains('on')===false) return;
   if(e.target.tagName==='INPUT') return;
   if(e.code==='Space'){ e.preventDefault(); if(!state.revealed){ revealAnswer(); } else draw(); }
-  else if(e.key==='g'){ if(state.revealed && !state.timedOut) score(true); }
-  else if(e.key==='m'){ if(state.revealed && !state.timedOut) score(false); }
+  else if(e.key==='g'){ if(state.revealed && !state.timedOut) scoreActive(true); }
+  else if(e.key==='m'){ if(state.revealed && !state.timedOut) scoreActive(false); }
   else if(e.key==='s'){ draw(); }
 });
 
@@ -789,11 +875,12 @@ el('#drill-all-fams').onclick = () => {
   resetBag(); switchView('drill'); draw();
 };
 
-function downloadToughPDF(){
-  const list = DATA.filter(q => state.tough[q.n]).sort((a,b) => a.n - b.n);
+function downloadToughPDF(kid){
+  kid = kid || activeKid(); if(!kid) return;
+  const list = DATA.filter(q => kid.tough[q.n]).sort((a,b) => a.n - b.n);
   const stamp = new Date().toLocaleString(undefined, {dateStyle:'long', timeStyle:'short'});
   el('#tough-print-view').innerHTML = `
-    <h1>JBQ Tough List${state.childName ? ' — ' + esc(state.childName) : ''}</h1>
+    <h1>JBQ Tough List — ${esc(kid.name)}</h1>
     <p class="tp-meta">Generated ${esc(stamp)} · ${list.length} question${list.length===1?'':'s'}</p>
     ${list.length ? list.map(q => `
       <div class="tp-item">
@@ -805,11 +892,32 @@ function downloadToughPDF(){
   window.print();
   scheduleToughPrintCleanup();
 }
-function shareToughWhatsApp(){
-  const list = DATA.filter(q => state.tough[q.n]).sort((a,b) => a.n - b.n);
+function downloadAllToughPDF(){
+  const kidsWithTough = state.kids.filter(k => Object.keys(k.tough).length);
+  const stamp = new Date().toLocaleString(undefined, {dateStyle:'long', timeStyle:'short'});
+  el('#tough-print-view').innerHTML = `
+    <h1>JBQ Tough Lists — all kids</h1>
+    <p class="tp-meta">Generated ${esc(stamp)}</p>
+    ${kidsWithTough.length ? kidsWithTough.map(kid => {
+      const list = DATA.filter(q => kid.tough[q.n]).sort((a,b) => a.n - b.n);
+      return `<h2 style="font-family:var(--sans); font-size:17px; margin:22px 0 8px">${esc(kid.name)} (${list.length} question${list.length===1?'':'s'})</h2>
+        ${list.map(q => `
+          <div class="tp-item">
+            <p class="tp-q"><b>#${q.n} · ${q.p} pt</b> — ${esc(q.q)}</p>
+            <p class="tp-a">${esc(answerFlat(q))}${q.s ? ' — ' + esc(q.s) : ''}</p>
+          </div>`).join('')}`;
+    }).join('') : '<p>No tough questions marked yet.</p>'}`;
+  document.body.classList.add('printing-tough');
+  window.scrollTo(0, 0);
+  window.print();
+  scheduleToughPrintCleanup();
+}
+function shareToughWhatsApp(kid){
+  kid = kid || activeKid(); if(!kid) return;
+  const list = DATA.filter(q => kid.tough[q.n]).sort((a,b) => a.n - b.n);
   if(!list.length) return;
   const MAX = 20;
-  const header = `JBQ Tough List${state.childName ? ' — ' + state.childName : ''} (${list.length} question${list.length===1?'':'s'})`;
+  const header = `JBQ Tough List — ${kid.name} (${list.length} question${list.length===1?'':'s'})`;
   const lines = list.slice(0, MAX).map(q => `#${q.n} (${q.p}pt): ${q.q}\nAnswer: ${answerFlat(q)}`);
   let body = lines.join('\n\n');
   if(list.length > MAX) body += `\n\n…and ${list.length - MAX} more — use "Download tough list (PDF)" for the full list.`;
@@ -835,32 +943,92 @@ function refresh(){
   if(el('#view-browse').classList.contains('on')) paintBrowse();
 }
 
-/* ---------- name modal ---------- */
-function paintNameTag(){
-  const tag = el('#name-tag');
-  tag.textContent = state.childName ? 'Practicing: ' + state.childName : '';
-  tag.hidden = !state.childName;
+/* ---------- kids modal ---------- */
+function totalToughCount(){ return state.kids.reduce((s,k) => s + Object.keys(k.tough).length, 0); }
+function paintKidsTag(){
+  const btn = el('#kids-tag-btn');
+  if(!state.kids.length){ btn.hidden = true; return; }
+  btn.hidden = false;
+  btn.textContent = state.kids.length===1 ? state.kids[0].name : `${state.kids.length} kids`;
 }
+function renderKidManageList(){
+  const box = el('#kid-manage-list');
+  if(!state.kids.length){ box.innerHTML = `<p class="hint" style="margin:0">No kids added yet — add at least one name above.</p>`; return; }
+  box.innerHTML = state.kids.map(k => {
+    const n = Object.keys(k.tough).length;
+    return `<div class="kid-manage-row">
+      <span class="kid-manage-name">${esc(k.name)}</span>
+      <span class="kid-manage-count">${n} tough</span>
+      ${n ? `<button class="mini" data-kid-act="pdf" data-kid-id="${k.id}">PDF</button>
+             <button class="mini" data-kid-act="wa" data-kid-id="${k.id}">WhatsApp</button>` : ''}
+      <button class="kid-remove" data-kid-act="remove" data-kid-id="${k.id}" aria-label="Remove ${esc(k.name)}" title="Remove">✕</button>
+    </div>`;
+  }).join('');
+}
+function addKidFromInput(){
+  const input = el('#kid-input');
+  const name = input.value.trim();
+  if(!name) return;
+  const kid = makeKid(name);
+  state.kids.push(kid);
+  if(!state.activeKidId) state.activeKidId = kid.id;
+  input.value = '';
+  input.focus();
+  renderKidManageList();
+  saveKids();
+}
+el('#kid-add').onclick = addKidFromInput;
+el('#kid-input').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); addKidFromInput(); } });
+el('#kid-manage-list').addEventListener('click', e => {
+  const b = e.target.closest('[data-kid-act]'); if(!b) return;
+  const id = b.dataset.kidId;
+  const kid = state.kids.find(k => k.id===id);
+  if(!kid) return;
+  const act = b.dataset.kidAct;
+  if(act==='pdf') downloadToughPDF(kid);
+  else if(act==='wa') shareToughWhatsApp(kid);
+  else if(act==='remove'){
+    if(Object.keys(kid.tough).length && !confirm(`Remove ${kid.name}? Their tough list (${Object.keys(kid.tough).length} questions) will be lost.`)) return;
+    state.kids = state.kids.filter(k => k.id!==id);
+    if(state.activeKidId===id) state.activeKidId = null;
+    renderKidManageList();
+    saveKids();
+  }
+});
 function showNameModal(){
-  el('#name-input').value = state.childName || '';
+  const first = !state.everStarted;
+  el('#kids-modal-title').textContent = first ? "Who's practicing?" : 'Kids & tough lists';
+  el('#kids-modal-sub').textContent = first
+    ? "Add each child's name. You'll be able to pick who's answering before each question, and download a separate tough-list PDF for every kid."
+    : "Add more kids, or download/share any kid's tough-list PDF.";
+  el('#name-start').textContent = first ? 'Start practicing' : 'Done';
+  renderKidManageList();
   el('#name-modal').classList.add('on');
-  el('#name-input').focus();
+  el('#kid-input').focus();
 }
 function hideNameModal(){ el('#name-modal').classList.remove('on'); }
-el('#name-start').onclick = () => { state.childName = el('#name-input').value.trim(); paintNameTag(); hideNameModal(); };
-el('#name-skip').onclick = () => { state.childName = ''; paintNameTag(); hideNameModal(); };
-el('#name-input').addEventListener('keydown', e => { if(e.key==='Enter') el('#name-start').click(); });
+el('#name-start').onclick = () => {
+  addKidFromInput();
+  if(!state.kids.length){ state.kids.push(makeKid('Practice')); }
+  state.activeKidId = state.kids[0].id;
+  state.everStarted = true;
+  paintKidsTag();
+  hideNameModal();
+  saveKids();
+  paintCard();
+};
+el('#kids-tag-btn').onclick = showNameModal;
 
 /* ---------- refresh + unsaved tough-list guard ---------- */
 let intentionalReload = false;
 function doRefresh(){ intentionalReload = true; location.reload(); }
 function openRefreshGuard(){
-  const n = Object.keys(state.tough).length;
-  el('#guard-msg').textContent = n + ' question' + (n===1?'':'s') + ' on the tough list. Save as a PDF before refreshing?';
+  const n = totalToughCount();
+  el('#guard-msg').textContent = n + ' question' + (n===1?'':'s') + ' on tough lists across all kids. Save as a PDF before refreshing?';
   el('#guard-modal').classList.add('on');
 }
 el('#refresh-btn').onclick = () => {
-  if(Object.keys(state.tough).length > 0) openRefreshGuard();
+  if(totalToughCount() > 0) openRefreshGuard();
   else doRefresh();
 };
 el('#guard-cancel').onclick = () => el('#guard-modal').classList.remove('on');
@@ -868,17 +1036,22 @@ el('#guard-clear').onclick = () => { el('#guard-modal').classList.remove('on'); 
 el('#guard-save').onclick = () => {
   el('#guard-modal').classList.remove('on');
   refreshAfterPrint = true;
-  downloadToughPDF();
+  downloadAllToughPDF();
 };
 window.addEventListener('beforeunload', e => {
   if(intentionalReload) return;
-  if(Object.keys(state.tough).length > 0){ e.preventDefault(); e.returnValue = ''; }
+  if(totalToughCount() > 0){ e.preventDefault(); e.returnValue = ''; }
 });
 
 (async function init(){
-  const t = await store.get('jbq:tough');
-  if(t) state.tough = t;
-  paintNameTag();
+  const k = await store.get('jbq:kids');
+  if(Array.isArray(k) && k.length){
+    state.kids = k;
+    state.kidSeq = k.length;
+    state.activeKidId = k[0].id;
+    state.everStarted = true;
+  }
+  paintKidsTag();
   showNameModal();
   draw();
 })();

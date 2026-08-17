@@ -202,6 +202,8 @@ main{max-width:1000px; margin:0 auto; padding:8px 20px 60px}
 .modal input[type=text]{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; margin-bottom:16px; box-sizing:border-box}
 .modal-actions{display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap}
 .team-swap-row{display:flex; flex-direction:column; gap:8px; margin:0 0 16px}
+.award-actions{flex-direction:column}
+.award-actions .btn{width:100%; text-align:center}
 .team-swap-row .btn{width:100%; padding:8px 14px; font-size:13px}
 .foot{margin-top:34px; color:var(--muted); font-size:12px; line-height:1.6; border-top:1px solid var(--line); padding-top:14px}
 
@@ -323,6 +325,18 @@ body.printing-report #report-print-view{display:block !important}
       <button class="btn ghost" id="guard-cancel">Cancel</button>
       <button class="btn miss" id="guard-clear">Discard &amp; refresh</button>
       <button class="btn primary" id="guard-save">Save PDF &amp; refresh</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="award-modal">
+  <div class="modal">
+    <h2 id="award-modal-title">Which team?</h2>
+    <p id="award-modal-sub"></p>
+    <div class="modal-actions award-actions">
+      <button class="btn" id="award-team-a"></button>
+      <button class="btn" id="award-team-b"></button>
+      <button class="btn ghost" id="award-cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -454,20 +468,27 @@ function meetLabelText(){
   const m = MEETS.find(x=>x.id===state.meet);
   return m ? m.label : '';
 }
-function bonusPointKeys(){ return state.league==='C' ? [10] : [10,20,30]; }
+function pointValueActive(p){ return state.meet!=='custom' || !!state.customRange[p]; }
+function bonusPointKeys(){
+  if(state.league==='C') return pointValueActive(10) ? [10] : [];
+  return [10,20,30].filter(pointValueActive);
+}
 function otherSide(side){ return side==='A' ? 'B' : 'A'; }
 
 /* ---------- feasibility + round generation ---------- */
 function feasibility(){
   if(state.league==='C'){
+    if(!pointValueActive(10)) return 'Custom range for 10-pt is empty — League C needs 10-pt questions to generate a round.';
     const n10 = poolFor(10).length;
     return n10 < 23 ? `Not enough 10-pt questions in this range for League C: need 23, have ${n10}.` : null;
   }
-  const n10=poolFor(10).length, n20=poolFor(20).length, n30=poolFor(30).length;
-  const problems=[];
-  if(n10<13) problems.push(`10-pt needs 13, have ${n10}`);
-  if(n20<10) problems.push(`20-pt needs 10, have ${n20}`);
-  if(n30<6) problems.push(`30-pt needs 6, have ${n30}`);
+  const activeTiers = [10,20,30].filter(pointValueActive);
+  if(!activeTiers.length) return 'Custom range is empty for every point value — set a range for at least one point value.';
+  const need = {10:13, 20:10, 30:6};
+  const problems = activeTiers
+    .map(p => ({p, n: poolFor(p).length}))
+    .filter(({p,n}) => n < need[p])
+    .map(({p,n}) => `${p}-pt needs ${need[p]}, have ${n}`);
   return problems.length ? `Not enough questions in this range — ${problems.join('; ')}.` : null;
 }
 function blankSlotFields(){
@@ -486,9 +507,16 @@ function makeRound(){
     mainQs = shuffle(draw(10, 20));
     bonusByP = {10: draw(10, 3)};
   } else {
-    const m10 = draw(10,10), m20 = draw(20,7), m30 = draw(30,3);
-    mainQs = shuffle([...m10, ...m20, ...m30]);
-    bonusByP = {10: draw(10,3), 20: draw(20,3), 30: draw(30,3)};
+    const mainCounts = {10:10, 20:7, 30:3};
+    const bonusCounts = {10:3, 20:3, 30:3};
+    const activeTiers = [10,20,30].filter(pointValueActive);
+    const mainParts = [];
+    bonusByP = {};
+    activeTiers.forEach(p => {
+      mainParts.push(...draw(p, mainCounts[p]));
+      bonusByP[p] = draw(p, bonusCounts[p]);
+    });
+    mainQs = shuffle(mainParts);
   }
   const slots = mainQs.map(q => Object.assign({n:q.n, p:q.p, status:'pending', misreadFrom:null, origin:'main'}, blankSlotFields()));
   const bonus = {};
@@ -507,13 +535,14 @@ function makeRound(){
     bonusContinuing: false,
     showBonusPrompt: false,
     scores: {A:0, B:0},
+    awards: [],
     timerStart: null,
     timerEnd: null
   };
 }
 function hasProgress(){
   const r = state.round; if(!r) return false;
-  return r.slots.some(s => s.attempts.length>0 || s.missed) || Object.values(r.bonus).some(list => list.some(b => b.used));
+  return r.slots.some(s => s.attempts.length>0 || s.missed) || Object.values(r.bonus).some(list => list.some(b => b.used)) || r.awards.length>0;
 }
 function findBonusEntry(n){
   const r = state.round; if(!r) return null;
@@ -830,10 +859,41 @@ function paintRoundHead(){
         <p class="rh-title">${esc(r.league==='C' ? 'League C' : 'League A/B')} round · ${esc(r.meetLabel)}</p>
         <p class="rh-meta">${r.mainCount} main question${r.mainCount===1?'':'s'} · ${r.slots.length-r.mainCount} bonus asked so far</p>
       </div>
-      <div class="rh-actions"><button class="btn ghost" id="gen-btn">Regenerate new set</button></div>`;
+      <div class="rh-actions">
+        <button class="btn good" id="quizout-btn" title="Award +10 for a quizout (6 correct in a row)">+10 Quizout</button>
+        <button class="btn miss" id="foul-btn" title="Deduct −5 for a foul">−5 Foul</button>
+        <button class="btn ghost" id="gen-btn">Regenerate new set</button>
+      </div>`;
+    el('#quizout-btn').onclick = () => openAwardModal('quizout', 10);
+    el('#foul-btn').onclick = () => openAwardModal('foul', -5);
   }
   el('#gen-btn').onclick = generateRound;
 }
+let pendingAward = null;
+function openAwardModal(type, delta){
+  if(!state.round) return;
+  pendingAward = {type, delta};
+  const verb = delta > 0 ? `+${delta}` : `${delta}`;
+  el('#award-modal-title').textContent = type==='quizout' ? 'Quizout — which team?' : 'Foul — which team?';
+  el('#award-modal-sub').textContent = type==='quizout'
+    ? `A team member answered 6 in a row. Award ${verb} points to which team?`
+    : `Deduct ${verb} points from which team?`;
+  el('#award-team-a').textContent = `${state.teams.A.name} (${verb})`;
+  el('#award-team-b').textContent = `${state.teams.B.name} (${verb})`;
+  el('#award-modal').classList.add('on');
+}
+function closeAwardModal(){ el('#award-modal').classList.remove('on'); pendingAward = null; }
+function applyAward(side){
+  const r = state.round;
+  if(!pendingAward || !r) return;
+  r.scores[side] += pendingAward.delta;
+  r.awards.push({type: pendingAward.type, side, delta: pendingAward.delta, at: Date.now()});
+  closeAwardModal();
+  paintAll();
+}
+el('#award-team-a').onclick = () => applyAward('A');
+el('#award-team-b').onclick = () => applyAward('B');
+el('#award-cancel').onclick = closeAwardModal;
 function wireCardActions(){
   els('#round-body [data-act]').forEach(b => b.onclick = () => {
     const r = state.round; const act = b.dataset.act;
@@ -987,8 +1047,9 @@ function computeReport(){
   (r ? r.slots : []).forEach(tally);
   if(r) bonusPointKeys().forEach(p => r.bonus[p].forEach(b => { if(b.usedAs==='tiebreak') tally(b); }));
   const duration = r && r.timerStart ? (r.timerEnd || Date.now()) - r.timerStart : 0;
-  return {stats, missedList, scores: r ? r.scores : {A:0,B:0}, duration, finished: !!(r && r.timerEnd)};
+  return {stats, missedList, scores: r ? r.scores : {A:0,B:0}, duration, finished: !!(r && r.timerEnd), awards: r ? r.awards : []};
 }
+function awardLabel(a){ return `${a.type==='quizout' ? 'Quizout' : 'Foul'} — ${esc(state.teams[a.side].name)} ${a.delta>0?'+':''}${a.delta} pts`; }
 function questionRowHTML(q){
   return `<div class="tough-row">
     <span class="num">#${q.n}<br><span class="pt-pill pt-pill-${q.p}">${q.p} pt</span></span>
@@ -1028,6 +1089,8 @@ function paintReport(){
     </div>
     <p class="count">Round duration: ${formatDuration(rep.duration)}${rep.finished?'':' (still running)'} · ${rep.missedList.length} question${rep.missedList.length===1?'':'s'} missed by both teams (no points lost)</p>
 
+    ${rep.awards.length ? `<h3>Quizouts &amp; fouls</h3>${rep.awards.map(a => `<p class="count">${awardLabel(a)}</p>`).join('')}` : ''}
+
     <h3>By point value (correct / incorrect)</h3>
     <div class="table-wrap"><table class="report-table">
       <thead><tr><th>Points</th><th>${esc(state.teams.A.name)}</th><th>${esc(state.teams.B.name)}</th></tr></thead>
@@ -1054,6 +1117,7 @@ function downloadReportPDF(){
     <p>${esc(state.teams.A.name)}: ${rep.scores.A} pts (${rep.stats.A.correct} correct, ${rep.stats.A.incorrect} incorrect)<br>
     ${esc(state.teams.B.name)}: ${rep.scores.B} pts (${rep.stats.B.correct} correct, ${rep.stats.B.incorrect} incorrect)<br>
     Missed by both teams: ${rep.missedList.length} (no points lost)</p>
+    ${rep.awards.length ? `<h2>Quizouts &amp; fouls</h2><p>${rep.awards.map(a=>awardLabel(a)).join('<br>')}</p>` : ''}
     <h2>By point value (correct / incorrect)</h2>
     <p>10 pt — ${esc(state.teams.A.name)} ${rep.stats.A.byP[10].c}/${rep.stats.A.byP[10].i} · ${esc(state.teams.B.name)} ${rep.stats.B.byP[10].c}/${rep.stats.B.byP[10].i}<br>
     20 pt — ${esc(state.teams.A.name)} ${rep.stats.A.byP[20].c}/${rep.stats.A.byP[20].i} · ${esc(state.teams.B.name)} ${rep.stats.B.byP[20].c}/${rep.stats.B.byP[20].i}<br>
@@ -1074,10 +1138,14 @@ function shareReportWhatsApp(){
   if(!r) return;
   const rep = computeReport();
   const header = `JBQ Round Health Report — ${state.teams.A.name} vs ${state.teams.B.name}`;
+  const awardsLine = rep.awards.length
+    ? '\n' + rep.awards.map(a => `${a.type==='quizout'?'Quizout':'Foul'} — ${state.teams[a.side].name} ${a.delta>0?'+':''}${a.delta} pts`).join('\n') + '\n'
+    : '';
   const body = `${state.teams.A.name}: ${rep.scores.A} pts (${rep.stats.A.correct} correct / ${rep.stats.A.incorrect} incorrect)\n`
     + `${state.teams.B.name}: ${rep.scores.B} pts (${rep.stats.B.correct} correct / ${rep.stats.B.incorrect} incorrect)\n`
-    + `Missed by both teams: ${rep.missedList.length}\nDuration: ${formatDuration(rep.duration)}\n\n`
-    + `Download the full Round Health Report (PDF) for the detailed question-by-question review.`;
+    + `Missed by both teams: ${rep.missedList.length}\nDuration: ${formatDuration(rep.duration)}\n`
+    + awardsLine
+    + `\nDownload the full Round Health Report (PDF) for the detailed question-by-question review.`;
   const url = 'https://wa.me/?text=' + encodeURIComponent(header + '\n\n' + body);
   window.open(url, '_blank');
 }
