@@ -423,6 +423,41 @@ function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;
 function qById(n){ return DATA_BY_N.get(n); }
 function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
 
+/* ---------- main-round ordering rules ----------
+   a. At least three 20-pt questions in each half of the match.
+   b. At least one 30-pt question in each half of the match.
+   c. The match neither starts nor ends with a 30-pt question.
+   d. 30-pt questions are never asked back-to-back. */
+function validMainSequence(seq){
+  const N = seq.length;
+  if(!N) return true;
+  const half = Math.ceil(N / 2);
+  const n30 = seq.filter(q => q.p === 30).length;
+  const n20 = seq.filter(q => q.p === 20).length;
+  if(n30){
+    if(seq[0].p === 30 || seq[N-1].p === 30) return false;
+    for(let i = 0; i < N-1; i++){ if(seq[i].p === 30 && seq[i+1].p === 30) return false; }
+    if(n30 >= 2){
+      let firstHalf30 = 0, secondHalf30 = 0;
+      seq.forEach((q,i) => { if(q.p===30){ if(i<half) firstHalf30++; else secondHalf30++; } });
+      if(!firstHalf30 || !secondHalf30) return false;
+    }
+  }
+  if(n20 >= 6){
+    let firstHalf20 = 0, secondHalf20 = 0;
+    seq.forEach((q,i) => { if(q.p===20){ if(i<half) firstHalf20++; else secondHalf20++; } });
+    if(firstHalf20 < 3 || secondHalf20 < 3) return false;
+  }
+  return true;
+}
+function arrangeMain(items){
+  for(let attempt = 0; attempt < 300; attempt++){
+    const seq = shuffle(items.slice());
+    if(validMainSequence(seq)) return seq;
+  }
+  return shuffle(items.slice()); // best-effort fallback for configurations too small/odd to satisfy every rule
+}
+
 function renderQ(q){
   const t = q.q.split(/\s+/);
   const pre  = t.slice(0, q.b-1).join(' ');
@@ -495,6 +530,9 @@ function blankSlotFields(){
   return {attempts:[], missed:false, awaitingInterruptFor:null, awaitingStealFrom:null, timeUpFlash:false};
 }
 function makeRound(){
+  // usedIds is local to this call on purpose: no question repeats within this match
+  // (main + bonus, enforced below), but a fresh match may freely reuse any question
+  // from an earlier match in the same Quiz Meet — there is no cross-match tracking.
   const usedIds = new Set();
   function draw(p, count){
     const pool = shuffle(poolFor(p).filter(q => !usedIds.has(q.n)));
@@ -516,7 +554,7 @@ function makeRound(){
       mainParts.push(...draw(p, mainCounts[p]));
       bonusByP[p] = draw(p, bonusCounts[p]);
     });
-    mainQs = shuffle(mainParts);
+    mainQs = arrangeMain(mainParts);
   }
   const slots = mainQs.map(q => Object.assign({n:q.n, p:q.p, status:'pending', misreadFrom:null, origin:'main'}, blankSlotFields()));
   const bonus = {};
