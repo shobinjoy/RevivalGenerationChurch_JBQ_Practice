@@ -177,6 +177,7 @@ main{max-width:1000px; margin:0 auto; padding:8px 20px 60px}
 #tough-print-view .tp-meta{font-family:var(--mono); font-size:12px; color:var(--muted); margin:0 0 18px}
 #tough-print-view .tp-item{margin:0 0 14px}
 #tough-print-view .tp-q{font-family:var(--serif); font-size:16px; margin:0 0 4px}
+#tough-print-view .tp-intro{font-weight:700}
 #tough-print-view .tp-a{font-family:var(--sans); font-size:13px; color:var(--muted); margin:0}
 .header-btn{background:#20262F; color:#fff; border:1px solid #333C48; border-radius:7px; padding:7px 13px; font-weight:700; font-size:14px}
 .header-btn:hover{background:#2A313C}
@@ -545,6 +546,23 @@ function answerHTML(q){
   return body + (q.s ? `<div class="sref">${esc(q.s)}</div>` : '');
 }
 function answerFlat(q){ return q.Q ? `${q.r} — ${q.v}` : q.a.join(' · '); }
+function toughQuestionParts(q){
+  const words = tokens(q);
+  const breakpoint = Math.max(1, Math.min(words.length, q.b));
+  return {
+    emphasized: words.slice(0, breakpoint).join(' '),
+    remainder: words.slice(breakpoint).join(' ')
+  };
+}
+function toughQuestionHTML(q){
+  const parts = toughQuestionParts(q);
+  return `${q.Q ? '<span class="tp-intro">Quotation Question: </span>' : ''}`
+    + `<strong>${esc(parts.emphasized)}</strong>${parts.remainder ? ' ' + esc(parts.remainder) : ''}`;
+}
+function toughQuestionWhatsApp(q){
+  const parts = toughQuestionParts(q);
+  return `${q.Q ? '*Quotation Question:* ' : ''}*${parts.emphasized}*${parts.remainder ? ' ' + parts.remainder : ''}`;
+}
 
 /* ---------- drill ---------- */
 function resetBag(){ state.bag=[]; state.shown=0; stopTimer(); }
@@ -892,7 +910,7 @@ function downloadToughPDF(kid){
     <p class="tp-meta">Generated ${esc(stamp)} · ${list.length} question${list.length===1?'':'s'}</p>
     ${list.length ? list.map(q => `
       <div class="tp-item">
-        <p class="tp-q"><b>#${q.n} · ${q.p} pt</b> — ${esc(q.q)}</p>
+        <p class="tp-q"><b>#${q.n} · ${q.p} pt</b> — ${toughQuestionHTML(q)}</p>
         <p class="tp-a">${esc(answerFlat(q))}${q.s ? ' — ' + esc(q.s) : ''}</p>
       </div>`).join('') : '<p>No tough questions marked yet.</p>'}`;
   document.body.classList.add('printing-tough');
@@ -911,7 +929,7 @@ function downloadAllToughPDF(){
       return `<h2 style="font-family:var(--sans); font-size:17px; margin:22px 0 8px">${esc(kid.name)} (${list.length} question${list.length===1?'':'s'})</h2>
         ${list.map(q => `
           <div class="tp-item">
-            <p class="tp-q"><b>#${q.n} · ${q.p} pt</b> — ${esc(q.q)}</p>
+            <p class="tp-q"><b>#${q.n} · ${q.p} pt</b> — ${toughQuestionHTML(q)}</p>
             <p class="tp-a">${esc(answerFlat(q))}${q.s ? ' — ' + esc(q.s) : ''}</p>
           </div>`).join('')}`;
     }).join('') : '<p>No tough questions marked yet.</p>'}`;
@@ -926,7 +944,7 @@ function shareToughWhatsApp(kid){
   if(!list.length) return;
   const MAX = 20;
   const header = `JBQ Tough List — ${kid.name} (${list.length} question${list.length===1?'':'s'})`;
-  const lines = list.slice(0, MAX).map(q => `#${q.n} (${q.p}pt): ${q.q}\nAnswer: ${answerFlat(q)}`);
+  const lines = list.slice(0, MAX).map(q => `#${q.n} (${q.p}pt): ${toughQuestionWhatsApp(q)}\nAnswer: ${answerFlat(q)}`);
   let body = lines.join('\n\n');
   if(list.length > MAX) body += `\n\n…and ${list.length - MAX} more — use "Download tough list (PDF)" for the full list.`;
   const url = 'https://wa.me/?text=' + encodeURIComponent(header + '\n\n' + body);
