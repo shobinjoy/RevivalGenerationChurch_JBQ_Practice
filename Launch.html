@@ -396,11 +396,12 @@ body.printing-tough #tough-print-view{display:block !important}
       <button class="chip" id="show-ans" aria-pressed="false">Show answers</button>
       <button class="chip" id="show-later" aria-pressed="false">Include later meets</button>
       <button class="chip" id="sort-mode" aria-pressed="false">Sort by size</button>
+      <button class="chip" id="sort-alpha" aria-pressed="false">Sort alphabetically</button>
       <span class="count" id="fam-count"></span>
       <button class="mini" id="drill-all-fams">Drill all filtered sets</button>
       <button class="mini" id="print-fams">Print this list</button>
     </div>
-    <p class="note">Questions grouped by the words they share. The highlighted word is the first one that tells them apart — that's where a quizzer can safely buzz. Sets with the longest shared opening come first — those are the easiest to mix up.</p>
+    <p class="note">Questions grouped by the words they share. The highlighted word is the first one that tells them apart — that's where a quizzer can safely buzz. By default, sets with the longest shared opening come first — those are the easiest to mix up. Use the sort options to reorder the list.</p>
     <div id="fam-list"></div>
   </section>
 
@@ -454,7 +455,7 @@ const state = {
   meet:1, league:'AB',
   pts:{10:true,20:true,30:true},
   onlyQuote:false, cut:false, toughOnly:false,
-  famPts:{10:true,20:true,30:true}, showAns:false, showLater:false, sortBySize:false,
+  famPts:{10:true,20:true,30:true}, showAns:false, showLater:false, sortBySize:false, sortAlphabetically:false,
   famFilter:null,           // drill restricted to one look-alike set
   current:null, revealed:false,
   bag:[], shown:0,
@@ -746,9 +747,11 @@ function filteredFamilies(){
 function paintFams(){
   const list = el('#fam-list');
   const fams = filteredFamilies()
-    .sort((a,b) => state.sortBySize
-        ? (b.inr.length - a.inr.length || stemOf(b.all[0]).split(' ').length - stemOf(a.all[0]).split(' ').length)
-        : (stemOf(b.all[0]).split(' ').length - stemOf(a.all[0]).split(' ').length || b.inr.length - a.inr.length));
+    .sort((a,b) => state.sortAlphabetically
+        ? (stemOf(a.all[0]).localeCompare(stemOf(b.all[0]), undefined, {sensitivity:'base'}) || a.all[0].n - b.all[0].n)
+        : state.sortBySize
+          ? (b.inr.length - a.inr.length || stemOf(b.all[0]).split(' ').length - stemOf(a.all[0]).split(' ').length)
+          : (stemOf(b.all[0]).split(' ').length - stemOf(a.all[0]).split(' ').length || b.inr.length - a.inr.length));
 
   el('#fam-count').textContent = fams.length + ' look-alike set' + (fams.length===1?'':'s')
     + ' · ' + fams.reduce((s,f)=>s+f.inr.length,0) + ' questions';
@@ -901,8 +904,17 @@ el('#cut').onclick = () => {
 el('#show-ans').onclick = () => { state.showAns=!state.showAns; el('#show-ans').setAttribute('aria-pressed',String(state.showAns)); paintFams(); };
 el('#show-later').onclick = () => { state.showLater=!state.showLater; el('#show-later').setAttribute('aria-pressed',String(state.showLater)); paintFams(); };
 el('#sort-mode').onclick = () => { state.sortBySize=!state.sortBySize;
+  state.sortAlphabetically=false;
   const b=el('#sort-mode'); b.setAttribute('aria-pressed',String(state.sortBySize));
-  b.textContent = state.sortBySize ? 'Sorted by size' : 'Sort by size'; paintFams(); };
+  b.textContent = state.sortBySize ? 'Sorted by size' : 'Sort by size';
+  const alpha=el('#sort-alpha'); alpha.setAttribute('aria-pressed','false'); alpha.textContent='Sort alphabetically'; paintFams(); };
+el('#sort-alpha').onclick = () => {
+  state.sortAlphabetically=!state.sortAlphabetically;
+  state.sortBySize=false;
+  const b=el('#sort-alpha'); b.setAttribute('aria-pressed',String(state.sortAlphabetically));
+  b.textContent = state.sortAlphabetically ? 'Sorted alphabetically' : 'Sort alphabetically';
+  const size=el('#sort-mode'); size.setAttribute('aria-pressed','false'); size.textContent='Sort by size'; paintFams();
+};
 el('#print-fams').onclick = () => window.print();
 el('#drill-all-fams').onclick = () => {
   const nums = filteredFamilies().flatMap(f => (state.showLater ? f.all : f.inr).map(q => q.n));
